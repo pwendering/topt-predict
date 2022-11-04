@@ -1,13 +1,6 @@
-from ParseMeltome import ParseMeltome
-from RetrieveSeqs import RetrieveSeqs
-from urllib import request
-import time
 import ExtractSeqFeatures
 import PredictKeyTemps
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-
 
 
 def main(meltome_file):
@@ -15,18 +8,19 @@ def main(meltome_file):
     # pm = ParseMeltome(meltome_file)
     # pm.parse_meltome()
 
-    '''ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
+    ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
                                                features=["MISC", "AAC", "QSOrder", "CTDC", "PAAC"])
 
     x_data, y_data, x_ids, y_ids, x_vars, y_vars, datasets = PredictKeyTemps.prepare_data("aa_features.csv",
                                                                                           "curve_params.csv", 70)
-    PredictKeyTemps.write_clean_data(x_data, y_data, datasets)'''
+    PredictKeyTemps.write_clean_data(x_data, y_data, datasets)
     x_data, y_data, datasets = PredictKeyTemps.read_clean_data()
     print("Number of samples: %d" % x_data.shape[0])
     print("Number of features: %d" % x_data.shape[1])
 
     X, y, datasets = PredictKeyTemps.remove_y_outliers_per_group(x_data, -y_data[:, 1], datasets)
     print("Reduced number of samples: %d" % X.shape[0])
+
     '''
     sns.boxplot(x=datasets, y=y)
     plt.xticks(rotation=90)
@@ -52,7 +46,7 @@ def main(meltome_file):
     plt.savefig("rf_feature_importances_30.png", bbox_inches='tight')
     plt.close()
 
-    PredictKeyTemps.knn(X, y, datasets)
+    # PredictKeyTemps.knn(X, y, datasets)
 
 
 if __name__ == '__main__':
