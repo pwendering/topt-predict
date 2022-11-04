@@ -1,5 +1,4 @@
 import iFeatureOmegaCLI
-from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import pandas as pd
 import numpy as np
@@ -91,35 +90,41 @@ def get_misc_features(fasta_file, seq_limit=50000):
         ids = []
         seq_idx = []
         seq_counter = 0
-        for seq_record in SeqIO.parse(fasta_file, "fasta"):
-            seq_counter += 1
-            seq_length = len(seq_record.seq)
-            # remove X from sequence as ProteinAnalysis cannot handle X
-            prot = ProteinAnalysis(str(seq_record.seq).replace("X", "").replace("U", ""))
-            sec_str_fract = prot.secondary_structure_fraction()
-            group_freqs = count_group_fequencies(str(seq_record.seq))
-            if seq_length <= seq_limit:  # 2285 = 99% percentile
-                seq_idx.append(seq_counter - 1)
-                ids.append(seq_record.id)
-                entries = [seq_length,
-                           prot.molecular_weight(),
-                           prot.isoelectric_point(),
-                           prot.aromaticity(),
-                           prot.instability_index(),
-                           sec_str_fract[0],
-                           sec_str_fract[1],
-                           sec_str_fract[2],
-                           1-np.sum(sec_str_fract),
-                           prot.molar_extinction_coefficient()[0],
-                           prot.gravy(),
-                           entropy(str(seq_record.seq).replace("X", "").replace("U", "")),
-                           group_freqs[0],
-                           group_freqs[1],
-                           group_freqs[2],
-                           group_freqs[3],
-                           group_freqs[4]]
-                feat_lists.append(entries)
-
+        with open(fasta_file, "r") as f:
+            # read first ID
+            ID = f.readline().strip(">").strip("\n")
+            while ID != "":
+                # read current sequence
+                seq = f.readline().strip("\n")
+                seq_counter += 1
+                seq_length = len(seq)
+                # remove X from sequence as ProteinAnalysis cannot handle X
+                prot = ProteinAnalysis(seq.replace("X", "").replace("U", ""))
+                sec_str_fract = prot.secondary_structure_fraction()
+                group_freqs = count_group_fequencies(seq)
+                if seq_length <= seq_limit:  # 2285 = 99% percentile
+                    seq_idx.append(seq_counter - 1)
+                    ids.append(ID)
+                    entries = [seq_length,
+                               prot.molecular_weight(),
+                               prot.isoelectric_point(),
+                               prot.aromaticity(),
+                               prot.instability_index(),
+                               sec_str_fract[0],
+                               sec_str_fract[1],
+                               sec_str_fract[2],
+                               1-np.sum(sec_str_fract),
+                               prot.molar_extinction_coefficient()[0],
+                               prot.gravy(),
+                               entropy(seq.replace("X", "").replace("U", "")),
+                               group_freqs[0],
+                               group_freqs[1],
+                               group_freqs[2],
+                               group_freqs[3],
+                               group_freqs[4]]
+                    feat_lists.append(entries)
+                # read next ID
+                ID = f.readline().strip(">").strip("\n")
         # create dataframe of features
         cols = ["SEQL", "MW", "ISOEP", "AROM", "INST", "HELIXF", "TURNF", "SHEETF", "REMAINF", "MEXTC_1", "GRAVY",
                 "ENTROPY", "G1", "G2", "G3", "G4", "G5"]
