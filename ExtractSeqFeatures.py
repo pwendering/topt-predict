@@ -3,7 +3,6 @@ from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import minmax_scale
-from sklearn.preprocessing import scale
 import seaborn as sb
 import matplotlib.pyplot as plt
 import os.path as op
@@ -34,9 +33,6 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
             df = pd.read_csv(feat + ".csv")
             # remove first column (protein IDs)
             df.drop(columns=df.columns[0], axis=1, inplace=True)
-            # min max scaling
-            cols = df.columns
-            df = pd.DataFrame(minmax_scale(df), columns=cols)
             df_prot = pd.concat([df_prot, df], axis=1)
         else:
             if not check_valid_feature(feat):
@@ -130,15 +126,12 @@ def get_misc_features(fasta_file, seq_limit=50000):
                 "ENTROPY", "G1", "G2", "G3", "G4", "G5"]
         feat_array = np.asarray(feat_lists)
         del feat_lists
-        # first log10-transform SEQL, MW, and MEXTC_1
+        # log10-transform SEQL, MW, and MEXTC_1
         log_col_idx = [x in ["SEQL", "MW", "MEXTC_1"] for x in cols]
         feat_array[:, log_col_idx] = np.log10(feat_array[:, log_col_idx])
         # remove inf values (some MEXTC_1 values are zero)
         feat_array[np.where(np.isinf(feat_array))] = np.nan
-        # do min/max scaling for all columns
-        feat_array_norm = minmax_scale(feat_array)
-        del feat_array
-        df_misc = pd.DataFrame(feat_array_norm, columns=cols)
+        df_misc = pd.DataFrame(feat_array, columns=cols)
         df_write = df_misc.copy()
         df_write['ID'] = ids
         df_write['idx'] = seq_idx
