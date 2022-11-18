@@ -1,24 +1,24 @@
 from sklearn.svm import SVR
 from sklearn import linear_model
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.feature_selection import RFECV
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 import numpy as np
-import pandas as pd
 import re
 from cubist import Cubist
 import matplotlib.pyplot as plt
 import seaborn as sb
 from xgboost import XGBRegressor
 from sklearn.neural_network import MLPRegressor
-
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+import pandas as pd
 
 def read_x_data(x_data_file):
     print("Reading X data")
@@ -87,7 +87,6 @@ def prepare_data(x_data_file, y_data_file, pct_rmse=95):
 
     return x_matrix, y_matrix, x_ids, y_ids, x_vars, y_vars, datasets
 
-
 def write_clean_data(x_data, y_data, datasets):
     print("Writing clean data to file")
     np.savetxt("X.csv", x_data, delimiter=",")
@@ -131,12 +130,27 @@ def split_data_train_test(x_data, y_data, pct_test=40):
     return X_train, X_test, y_train, y_test, idx_test
 
 
+def get_scaler(X_train, method="standard"):
+    if method == "standard":
+        scaler = StandardScaler().fit(X_train)
+    elif method == "minmax":
+        scaler = MinMaxScaler().fit(X_train)
+    else:
+        scaler = None
+    return scaler
+
+
 def score_prediction(y_pred, y_test):
-    print("Root mean squared error: %.2f" % np.sqrt(mean_squared_error(y_test, y_pred)))
-    print("Mean absolute error: %.2f" % np.sqrt(mean_absolute_error(y_test, y_pred)))
-    print("Mean absolute percentage error: %.2f" % np.sqrt(mean_absolute_percentage_error(y_test, y_pred)))
-    print("Coefficient of determination: %.2f" % r2_score(y_test, y_pred))
-    print("Pearson correlation: %.2f\n\n" % np.corrcoef(y_test, y_pred)[0][1])
+    # RMSE
+    print("%.2f" % np.sqrt(mean_squared_error(y_test, y_pred)), end="\t")
+    # MAE
+    print("%.2f" % np.sqrt(mean_absolute_error(y_test, y_pred)), end="\t")
+    # MAPE
+    print("%.2f" % np.sqrt(mean_absolute_percentage_error(y_test, y_pred)), end="\t")
+    # R2
+    print("%.2f" % r2_score(y_test, y_pred), end="\t")
+    # rhoP
+    print("%.2f" % np.corrcoef(y_test, y_pred)[0][1])
 
 
 def scatter_test_pred(y_pred, y_test, groups=None, fname="scatterplot.png"):
@@ -155,109 +169,141 @@ def scatter_test_pred(y_pred, y_test, groups=None, fname="scatterplot.png"):
 
 
 def svr_rbf(x_data, y_data):
-    print("Training SVR (RBF kernel)")
-    regr = SVR(kernel="rbf", C=100, gamma=0.1, epsilon=0.1)
-
+    print("SVR (RBF kernel)", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
 
-    regr.fit(X_train, y_train)
+    regr = SVR(kernel="rbf")
+    regr.fit(X_train_transformed, y_train)
 
-    y_pred = regr.predict(X_test)
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
     return regr
 
 
 def svr_linear(x_data, y_data):
-    print("Training SVR (linear kernel)")
-    regr = SVR(kernel="linear", C=100, gamma="auto", epsilon=0.3)
-
+    print("SVR (linear kernel)", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
 
-    regr.fit(X_train, y_train)
+    regr = SVR(kernel="linear")
+    regr.fit(X_train_transformed, y_train)
 
-    y_pred = regr.predict(X_test)
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
     return regr
 
 
 def svr_poly(x_data, y_data):
-    print("Training SVR (polynomial kernel)")
-    regr = SVR(kernel="poly", C=100, gamma="auto", degree=3, epsilon=0.1, coef0=1)
-
+    print("SVR (polynomial kernel)", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
 
-    regr.fit(X_train, y_train)
+    regr = SVR(kernel="poly")
+    regr.fit(X_train_transformed, y_train)
 
-    y_pred = regr.predict(X_test)
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
     return regr
 
 
-def ols(x_data, y_data):
-    print("OLS model")
+def ridge(x_data, y_data, alpha=.5):
+    print("Ridge (alpha=" + str(alpha) + ")", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    regr = linear_model.LinearRegression()
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr = linear_model.Ridge(alpha=alpha)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
+    return regr
 
-def ridge(x_data, y_data):
-    print("Ridge regression model")
+
+def lasso(x_data, y_data, alpha=.01):
+    print("Lasso (alpha=" + str(alpha) + ")", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    print("alpha = 0.5")
-    regr = linear_model.Ridge(alpha=.5)
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr = linear_model.Lasso(alpha=alpha)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
-
-def lasso(x_data, y_data):
-    print("Lasso regression")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    print("alpha = 0.01")
-    regr = linear_model.Lasso(alpha=.01)
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
-    score_prediction(y_pred, y_test)
-
+    return regr
 
 def gbdt(x_data, y_data, groups=None):
-    print("Gradient Boosted Decision Tree")
+    print("GBDT", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
-    regr = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=1, random_state=42, loss='squared_error')
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr = GradientBoostingRegressor()
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_gbdt.png')
 
+    return regr
+
 
 def adaboost(x_data, y_data):
-    print("AdaBoost regression")
+    print("AdaBoost", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    regr = AdaBoostRegressor(random_state=42, n_estimators=100)
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr = AdaBoostRegressor(random_state=42)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
+    return regr
 
-def randomforest(x_data, y_data, groups=None, hyperparam=False, njobs=1):
-    print("Random Forest")
+
+def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, njobs=1):
+    print("Random Forest", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
-    regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
-                                 max_features='sqrt', max_depth=None, bootstrap=False)
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+
+    if optimal:
+        regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
+                                    max_features='sqrt', max_depth=None, bootstrap=False)
+    else:
+        regr = RandomForestRegressor(random_state=42)
+
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_rf.png')
 
     if hyperparam:
-        print("Hyperparameter fitting")
+        print("\nHyperparameter fitting")
         # Number of trees in random forest
         n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=10)]
         # Number of features to consider at every split
@@ -279,11 +325,13 @@ def randomforest(x_data, y_data, groups=None, hyperparam=False, njobs=1):
                        'min_samples_leaf': min_samples_leaf,
                        'bootstrap': bootstrap}
 
+        regr = RandomForestRegressor(random_state=42)
         rf_random = RandomizedSearchCV(estimator=regr, param_distributions=random_grid, n_iter=100, cv=10, verbose=2,
                                        random_state=42, n_jobs=njobs)
-        rf_random.fit(X_train, y_train)
+        rf_random.fit(X_train_transformed, y_train)
         print(rf_random.best_params_)
-        y_pred = rf_random.best_estimator_.predict(X_test)
+        print("\nRandom Forest (optimized)", end="\t")
+        y_pred = rf_random.best_estimator_.predict(X_test_transformed)
         score_prediction(y_pred, y_test)
         scatter_test_pred(y_pred, y_test, groups, 'scatter_rf_optimized.png')
 
@@ -291,58 +339,87 @@ def randomforest(x_data, y_data, groups=None, hyperparam=False, njobs=1):
 
 
 def knn(x_data, y_data, groups=None, k=10):
-    print("K-Nearest Neighbor")
+    print("KNN", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
-    neigh = KNeighborsRegressor(n_neighbors=k)
-    neigh.fit(X_train, y_train)
-    y_pred = neigh.predict(X_test)
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr = KNeighborsRegressor(n_neighbors=k)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_knn.png')
 
 
 def cubist_reg(x_data, y_data, groups=None):
-    print("Cubist regression")
+    print("Cubist", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
     regr = Cubist()
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_cubist.png')
+
+
     return regr
 
 
 def bayesian_ridge(x_data, y_data, groups=None):
-    print("Bayesian ridge regression")
+    print("Bayesian ridge", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
     regr = linear_model.BayesianRidge()
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_bayesian_ridge.png')
+
     return regr
 
 
 def xgboost_reg(x_data, y_data, groups=None):
-    print("XGBoost regression")
+    print("XGBoost", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
     regr = XGBRegressor()
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+    regr.fit(X_train_transformed, y_train)
+
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_xgboost.png')
+
     return regr
 
 def mlpreg(x_data, y_data, groups=None):
-    print("MLP regression")
+    print("MLP", end="\t")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
     regr = MLPRegressor()
-    regr.fit(X_train, y_train)
-    y_pred = regr.predict(X_test)
+
+    scaler = get_scaler(X_train)
+    X_train_transformed = scaler.transform(X_train)
+
+    regr.fit(X_train_transformed, y_train)
+    X_test_transformed = scaler.transform(X_test)
+    y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_xgboost.png')
     return regr
