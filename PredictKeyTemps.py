@@ -113,10 +113,9 @@ def remove_y_outliers_per_group(x_data, y_data, groups):
     uniq_groups = set(groups)
     for g in uniq_groups:
         group_idx = np.asarray([i for i in range(0, len(groups)) if groups[i] == g])
-        av, sd = np.median(y_data[group_idx]), np.std(y_data[group_idx])
+        med, sd = np.median(y_data[group_idx]), np.std(y_data[group_idx])
         sd_threshold = 3 * sd
-        t_lower, t_upper = av - sd_threshold, av + sd_threshold
-        # t_lower, t_upper = np.percentile(y_data[group_idx], (2.5, 97.5))
+        t_lower, t_upper = med - sd_threshold, med + sd_threshold
         remove_idx = np.where(np.logical_or((t_lower > y_data[group_idx]), (y_data[group_idx] > t_upper)))[0]
         y_data = np.delete(y_data, group_idx[remove_idx])
         x_data = np.delete(x_data, group_idx[remove_idx], axis=0)
@@ -249,7 +248,8 @@ def randomforest(x_data, y_data, groups=None, hyperparam=False, njobs=1):
     print("Random Forest")
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
-    regr = RandomForestRegressor(random_state=42)
+    regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
+                                 max_features='sqrt', max_depth=None, bootstrap=False)
     regr.fit(X_train, y_train)
     y_pred = regr.predict(X_test)
     score_prediction(y_pred, y_test)
