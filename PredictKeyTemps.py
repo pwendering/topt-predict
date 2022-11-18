@@ -125,8 +125,9 @@ def remove_y_outliers_per_group(x_data, y_data, groups):
     return x_data, y_data, groups
 
 
-def split_data_train_test(x_data, y_data):
-    X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(x_data, y_data, range(0, len(y_data)), test_size=0.4, random_state=42)
+def split_data_train_test(x_data, y_data, pct_test=40):
+    X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(x_data, y_data, range(0, len(y_data)),
+                                                                             test_size=pct_test/100, random_state=42)
     return X_train, X_test, y_train, y_test, idx_test
 
 
