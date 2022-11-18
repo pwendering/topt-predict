@@ -2,7 +2,6 @@ import iFeatureOmegaCLI
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import minmax_scale
 import seaborn as sb
 import matplotlib.pyplot as plt
 import os.path as op
@@ -10,7 +9,7 @@ from protlearn.features import entropy
 
 
 def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
-
+    print("Extracting sequence features")
     if features is None:
         features = ["AAC", "MISC"]
 
@@ -79,7 +78,6 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
 def get_misc_features(fasta_file, seq_limit=50000):
     # sequence length, molecular weight, isoelectric point, aromaticity, instability index,
     # secondary structure fraction (helix, turn, sheet)
-    print("Extracting various sequence features")
     fname = "misc.csv"
     if not check_file_exists(fname):
         feat_lists = []
