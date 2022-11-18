@@ -269,7 +269,8 @@ def randomforest(x_data, y_data, groups=None, hyperparam=False, njobs=1):
         # Minimum number of samples required at each leaf node
         min_samples_leaf = [1, 2, 4]
         # Method of selecting samples for training each tree
-        bootstrap = [True, False]  # Create the random grid
+        bootstrap = [True, False]
+        # Create the random grid
         random_grid = {'n_estimators': n_estimators,
                        'max_features': max_features,
                        'max_depth': max_depth,
