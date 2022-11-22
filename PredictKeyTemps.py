@@ -141,7 +141,7 @@ def get_scaler(X_train, method="standard"):
     return scaler
 
 
-def feature_selection(X, y, regr, n_jobs=1, step=10, cv=5):
+def feature_selection(X, y, regr, n_jobs=1, step=100, cv=5):
     print("Running RFCV")
     print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
@@ -155,16 +155,15 @@ def feature_selection(X, y, regr, n_jobs=1, step=10, cv=5):
     )
     rfecv = rfecv.fit(X, y)
 
-    res_df = pd.DataFrame(rfecv.cv_results)
+    res_df = pd.DataFrame(rfecv.cv_results_)
     res_df.to_csv("rfecv_results.csv")
 
-    feat_dict = {"feature_names_in": rfecv.feature_names_in_,
-                 "ranking": rfecv.ranking_,
+    feat_dict = {"ranking": rfecv.ranking_,
                  "support": rfecv.support_}
     feat_df = pd.DataFrame(feat_dict)
-    feat_df.to_csv("feature_scores.csv")
+    feat_df.to_csv("feature_ranking_support.csv")
 
-    print(str(rfecv.n_features) + "features selected.")
+    print(str(rfecv.n_features_) + " features selected.")
 
     return rfecv
 
@@ -328,7 +327,7 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
 
     if fselect:
-        feature_selection(x_data, y_data, regr, n_jobs=n_jobs)
+        feature_selection(x_data, y_data, regr, n_jobs=n_jobs, cv=5, step=100)
 
     if hyperparam:
         print("\nHyperparameter fitting")
