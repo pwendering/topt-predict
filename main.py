@@ -6,8 +6,9 @@ from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 
+
 def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False, train_hyperparams=False,
-         print_feature_importance=False):
+         print_feature_importance=False, select_features=False, n_jobs=1):
     if parse_meltome:
         print("Reading Meltome Atlas file")
         pm = ParseMeltome(meltome_file)
@@ -36,7 +37,7 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     X, y, datasets = PredictKeyTemps.remove_y_outliers_per_group(x_data, -y_data[:, 1], datasets)
     print("Reduced number of samples: %d" % X.shape[0])
 
-    print("\n\nTesting different regression approches:\n")
+    print("\n\nTesting different regression approaches:\n")
     print("Approach\tRMSE\tMAE\tMAPE\tR2\trhoP")
     '''PredictKeyTemps.lasso(X, y)
     PredictKeyTemps.ridge(X, y)
@@ -50,17 +51,23 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     PredictKeyTemps.cubist_reg(X, y, datasets)
     PredictKeyTemps.knn(X, y, datasets)'''
 
-    # Train random forest regressor
-    regr = PredictKeyTemps.randomforest(X, y, datasets, hyperparam=train_hyperparams, njobs=1,
-                                        optimal=True)
+    '''regr = PredictKeyTemps.randomforest(X, y, datasets, hyperparam=train_hyperparams, njobs=n_jobs,
+                                        optimal=True)'''
 
+    regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=True, hyperparam=train_hyperparams,
+                                        fselect=select_features, n_jobs=n_jobs)
+
+
+    '''# cross validation for predictor performance
+    # Train random forest regressor
+    
     # cross-validation
     scoring = ['neg_root_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error',
                'r2']
     scaler = StandardScaler().fit(X)
     X_transformed = scaler.transform(X)
-    scores = cross_validate(regr, X_transformed, y, scoring=scoring, cv=10)
-    pd.DataFrame(scores).to_csv("scores_rf.csv")
+    scores = cross_validate(regr, X_transformed, y, scoring=scoring, cv=10, n_jobs=n_jobs)
+    pd.DataFrame(scores).to_csv("scores_rf.csv")'''
 
     if print_feature_importance:
         with open("aa_features.csv", "r") as f:
@@ -80,7 +87,9 @@ if __name__ == '__main__':
         parse_meltome=False,
         extract_features=False,
         train_hyperparams=False,
-        print_feature_importance=False
+        select_features=True,
+        print_feature_importance=False,
+        n_jobs=1
     )
 
 
