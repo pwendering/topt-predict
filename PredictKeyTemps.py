@@ -8,6 +8,7 @@ from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.feature_selection import RFECV
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 import numpy as np
 import re
@@ -139,6 +140,38 @@ def get_scaler(X_train, method="standard"):
         scaler = None
     return scaler
 
+
+def feature_selection(X, y, regr, n_jobs=1, step=10, cv=5):
+    print("Running RFCV")
+    print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
+    rfecv = RFECV(
+        estimator=regr,
+        step=step,
+        cv=cv,
+        n_jobs=n_jobs,
+        scoring=r2_scorer,
+        min_features_to_select=1,
+        verbose=2
+    )
+    rfecv = rfecv.fit(X, y)
+
+    res_df = pd.DataFrame(rfecv.cv_results)
+    res_df.to_csv("rfecv_results.csv")
+
+    feat_dict = {"feature_names_in": rfecv.feature_names_in_,
+                 "ranking": rfecv.ranking_,
+                 "support": rfecv.support_}
+    feat_df = pd.DataFrame(feat_dict)
+    feat_df.to_csv("feature_scores.csv")
+
+    print(str(rfecv.n_features) + "features selected.")
+
+    return rfecv
+
+
+def r2_scorer(estimator, X_test, y_test):
+    y_pred = estimator.predict(X_test)
+    return r2_score(y_test, y_pred)
 
 def score_prediction(y_pred, y_test):
     # RMSE
@@ -281,26 +314,21 @@ def adaboost(x_data, y_data):
     return regr
 
 
-def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, njobs=1):
-    print("Random Forest", end="\t")
+def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fselect=False, n_jobs=1):
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
     scaler = get_scaler(X_train)
     X_train_transformed = scaler.transform(X_train)
-
+    X_test_transformed = scaler.transform(X_test)
 
     if optimal:
         regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
-                                    max_features='sqrt', max_depth=None, bootstrap=False)
+                                     max_features='sqrt', max_depth=None, bootstrap=False, n_jobs=n_jobs)
     else:
-        regr = RandomForestRegressor(random_state=42)
+        regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
 
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_rf.png')
+    if fselect:
+        feature_selection(x_data, y_data, regr, n_jobs=n_jobs)
 
     if hyperparam:
         print("\nHyperparameter fitting")
@@ -327,13 +355,20 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, nj
 
         regr = RandomForestRegressor(random_state=42)
         rf_random = RandomizedSearchCV(estimator=regr, param_distributions=random_grid, n_iter=100, cv=10, verbose=2,
-                                       random_state=42, n_jobs=njobs)
+                                       random_state=42, n_jobs=n_jobs)
         rf_random.fit(X_train_transformed, y_train)
         print(rf_random.best_params_)
         print("\nRandom Forest (optimized)", end="\t")
         y_pred = rf_random.best_estimator_.predict(X_test_transformed)
         score_prediction(y_pred, y_test)
         scatter_test_pred(y_pred, y_test, groups, 'scatter_rf_optimized.png')
+
+    print("Random Forest", end="\t")
+    regr.fit(X_train_transformed, y_train)
+
+    y_pred = regr.predict(X_test_transformed)
+    score_prediction(y_pred, y_test)
+    scatter_test_pred(y_pred, y_test, groups, 'scatter_rf.png')
 
     return regr
 
