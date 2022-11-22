@@ -141,7 +141,7 @@ def get_scaler(X_train, method="standard"):
     return scaler
 
 
-def feature_selection(X, y, regr, n_jobs=1, step=100, cv=5):
+def feature_selection(X, y, regr, n_jobs=1, step=1, cv=5):
     print("Running RFCV")
     print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
@@ -327,7 +327,7 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
 
     if fselect:
-        feature_selection(x_data, y_data, regr, n_jobs=n_jobs, cv=5, step=100)
+        feature_selection(x_data, y_data, regr, n_jobs=n_jobs, cv=5, step=20)
 
     if hyperparam:
         print("\nHyperparameter fitting")
