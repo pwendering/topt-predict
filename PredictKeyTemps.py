@@ -142,7 +142,7 @@ def get_scaler(X_train, method="standard"):
 
 
 def feature_selection(X, y, regr, n_jobs=1, step=1, cv=5):
-    print("Running RFCV")
+    print("Running RFECV")
     print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
         estimator=regr,
