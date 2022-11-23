@@ -17,7 +17,9 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     if extract_features:
         # Extract features from amino acid sequences
         ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
-                                                   features=["MISC", "AAC", "QSOrder", "CTDC", "PAAC"])
+                                                   features=["MISC", "AAC", "QSOrder", "CTDC", "PAAC", "AC", "CTriad", "DistancePair", "GAAC", "Geary",
+                                                       "Moran", "SOCNumber", "CKSAAP type 1", "CTDD", "DPC type 1", "GDPC type 1", "NMBroto",
+                                                       "PseKRAAC _type 10"])
 
         #  clean up datasets
         x_data, y_data, x_ids, y_ids, x_vars, y_vars, datasets = PredictKeyTemps.prepare_data("aa_features.csv",
@@ -89,7 +91,7 @@ if __name__ == '__main__':
         train_hyperparams=False,
         select_features=True,
         print_feature_importance=False,
-        n_jobs=1
+        n_jobs=10
     )
 
 
