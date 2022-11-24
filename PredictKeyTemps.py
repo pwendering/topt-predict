@@ -8,7 +8,7 @@ from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.feature_selection import RFECV
+from sklearn.feature_selection import RFECV, RFE
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 import numpy as np
 import re
@@ -141,7 +141,7 @@ def get_scaler(X_train, method="standard"):
     return scaler
 
 
-def feature_selection(X, y, regr, n_jobs=1, step=1, cv=5):
+def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
     print("Running RFECV")
     print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
@@ -200,116 +200,104 @@ def scatter_test_pred(y_pred, y_test, groups=None, fname="scatterplot.png"):
     plt.close(f)
 
 
-def svr_rbf(x_data, y_data):
-    print("SVR (RBF kernel)", end="\t")
+def perform_regression(regr, x_data, y_data, groups=None, plot=False, fout="scatter.png"):
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
+
     scaler = get_scaler(X_train)
     X_train_transformed = scaler.transform(X_train)
-
-    regr = SVR(kernel="rbf")
     regr.fit(X_train_transformed, y_train)
-
     X_test_transformed = scaler.transform(X_test)
     y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
+    if plot:
+        groups = [groups[i] for i in idx_test]
+        scatter_test_pred(y_pred, y_test, groups, fout)
+
+    return regr
+
+
+def svr_rbf(x_data, y_data):
+    print("SVR (RBF kernel)", end="\t")
+    regr = SVR(kernel="rbf")
+    regr = perform_regression(regr, x_data, y_data)
     return regr
 
 
 def svr_linear(x_data, y_data):
     print("SVR (linear kernel)", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = SVR(kernel="linear")
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-
+    regr = perform_regression(regr, x_data, y_data)
     return regr
 
 
 def svr_poly(x_data, y_data):
     print("SVR (polynomial kernel)", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = SVR(kernel="poly")
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-
+    regr = perform_regression(regr, x_data, y_data)
     return regr
 
 
 def ridge(x_data, y_data, alpha=.5):
     print("Ridge (alpha=" + str(alpha) + ")", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = linear_model.Ridge(alpha=alpha)
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-
+    regr = perform_regression(regr, x_data, y_data)
     return regr
 
 
 def lasso(x_data, y_data, alpha=.01):
     print("Lasso (alpha=" + str(alpha) + ")", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = linear_model.Lasso(alpha=alpha)
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-
+    regr = perform_regression(regr, x_data, y_data)
     return regr
+
 
 def gbdt(x_data, y_data, groups=None):
     print("GBDT", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = GradientBoostingRegressor()
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_gbdt.png')
-
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_gbdt.png", groups=groups)
     return regr
 
 
 def adaboost(x_data, y_data):
     print("AdaBoost", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
     regr = AdaBoostRegressor(random_state=42)
-    regr.fit(X_train_transformed, y_train)
+    regr = perform_regression(regr, x_data, y_data)
+    return regr
 
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
 
+def knn(x_data, y_data, groups=None, k=10):
+    print("KNN", end="\t")
+    regr = KNeighborsRegressor(n_neighbors=k)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_knn.png", groups=groups)
+    return regr
+
+
+def cubist_reg(x_data, y_data, groups=None):
+    print("Cubist", end="\t")
+    regr = Cubist()
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_cubist.png", groups=groups)
+    return regr
+
+
+def bayesian_ridge(x_data, y_data, groups=None):
+    print("Bayesian ridge", end="\t")
+    regr = linear_model.BayesianRidge()
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_bayesian_ridge.png", groups=groups)
+    return regr
+
+
+def xgboost_reg(x_data, y_data, groups=None):
+    print("XGBoost", end="\t")
+    regr = XGBRegressor()
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_xgboost.png", groups=groups)
+    return regr
+
+
+def mlpreg(x_data, y_data, groups=None):
+    print("MLP", end="\t")
+    regr = MLPRegressor()
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_mlp.png", groups=groups)
     return regr
 
 
@@ -321,13 +309,18 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
     X_test_transformed = scaler.transform(X_test)
 
     if optimal:
+        hyperparam = False
+        fselect = False
         regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
                                      max_features='sqrt', max_depth=None, bootstrap=False, n_jobs=n_jobs)
     else:
         regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
 
     if fselect:
-        feature_selection(x_data, y_data, regr, n_jobs=n_jobs, cv=5, step=10)
+        hyperparam = False
+        scaler = get_scaler(x_data)
+        x_data_transformed = scaler.transform(x_data)
+        feature_selection_rfecv(x_data_transformed, y_data, regr, n_jobs=n_jobs, step=10, cv=5)
 
     if hyperparam:
         print("\nHyperparameter fitting")
@@ -369,93 +362,6 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
     score_prediction(y_pred, y_test)
     scatter_test_pred(y_pred, y_test, groups, 'scatter_rf.png')
 
-    return regr
-
-
-def knn(x_data, y_data, groups=None, k=10):
-    print("KNN", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
-    regr = KNeighborsRegressor(n_neighbors=k)
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_knn.png')
-
-
-def cubist_reg(x_data, y_data, groups=None):
-    print("Cubist", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
-    regr = Cubist()
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_cubist.png')
-
-
-    return regr
-
-
-def bayesian_ridge(x_data, y_data, groups=None):
-    print("Bayesian ridge", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
-    regr = linear_model.BayesianRidge()
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_bayesian_ridge.png')
-
-    return regr
-
-
-def xgboost_reg(x_data, y_data, groups=None):
-    print("XGBoost", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
-    regr = XGBRegressor()
-    regr.fit(X_train_transformed, y_train)
-
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_xgboost.png')
-
-    return regr
-
-def mlpreg(x_data, y_data, groups=None):
-    print("MLP", end="\t")
-    X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
-    groups = [groups[i] for i in idx_test]
-    regr = MLPRegressor()
-
-    scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-
-    regr.fit(X_train_transformed, y_train)
-    X_test_transformed = scaler.transform(X_test)
-    y_pred = regr.predict(X_test_transformed)
-    score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_xgboost.png')
     return regr
 
 
