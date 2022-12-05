@@ -2,9 +2,10 @@ import ExtractSeqFeatures
 import PredictKeyTemps
 from ParseMeltome import ParseMeltome
 import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_validate
+from sklearn.model_selection import cross_validate, KFold
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 
 
 def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False, train_hyperparams=False,
@@ -19,7 +20,7 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
         ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
                                                    features=["MISC", "AAC", "QSOrder", "CTDC", "PAAC", "AC", "CTriad", "DistancePair", "GAAC", "Geary",
                                                        "Moran", "SOCNumber", "CKSAAP type 1", "CTDD", "DPC type 1", "GDPC type 1", "NMBroto",
-                                                       "PseKRAAC _type 10"])
+                                                       "PseKRAAC type 10"])
 
         #  clean up datasets
         x_data, y_data, x_ids, y_ids, x_vars, y_vars, datasets = PredictKeyTemps.prepare_data("aa_features.csv",
@@ -56,20 +57,22 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     '''regr = PredictKeyTemps.randomforest(X, y, datasets, hyperparam=train_hyperparams, njobs=n_jobs,
                                         optimal=True)'''
 
-    regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=True, hyperparam=train_hyperparams,
+    regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=False, hyperparam=train_hyperparams,
                                         fselect=select_features, n_jobs=n_jobs)
 
 
-    '''# cross validation for predictor performance
+    # cross validation for predictor performance
     # Train random forest regressor
-    
-    # cross-validation
+    '''
+    regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
     scoring = ['neg_root_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error',
                'r2']
     scaler = StandardScaler().fit(X)
     X_transformed = scaler.transform(X)
-    scores = cross_validate(regr, X_transformed, y, scoring=scoring, cv=10, n_jobs=n_jobs)
-    pd.DataFrame(scores).to_csv("scores_rf.csv")'''
+    kfsplit = KFold(n_splits=5, shuffle=True, random_state=42)
+    scores = cross_validate(regr, X_transformed, y, scoring=scoring, cv=kfsplit, n_jobs=n_jobs, pre_dispatch=n_jobs, verbose=2)
+    pd.DataFrame(scores).to_csv("scores_rf.csv")
+    '''
 
     if print_feature_importance:
         with open("aa_features.csv", "r") as f:
@@ -91,7 +94,7 @@ if __name__ == '__main__':
         train_hyperparams=False,
         select_features=True,
         print_feature_importance=False,
-        n_jobs=10
+        n_jobs=5
     )
 
 

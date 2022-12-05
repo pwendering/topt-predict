@@ -7,7 +7,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.feature_selection import RFECV, RFE
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 import numpy as np
@@ -143,7 +143,7 @@ def get_scaler(X_train, method="standard"):
 
 def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
     print("Running RFECV")
-    print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
+    # print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
         estimator=regr,
         step=step,
@@ -320,7 +320,8 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         hyperparam = False
         scaler = get_scaler(x_data)
         x_data_transformed = scaler.transform(x_data)
-        feature_selection_rfecv(x_data_transformed, y_data, regr, n_jobs=n_jobs, step=10, cv=5)
+        kfsplit = KFold(n_splits=5, shuffle=True, random_state=42)
+        feature_selection_rfecv(x_data_transformed, y_data, regr, n_jobs=n_jobs, step=10, cv=kfsplit)
 
     if hyperparam:
         print("\nHyperparameter fitting")
