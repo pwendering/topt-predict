@@ -9,7 +9,8 @@ from sklearn.ensemble import RandomForestRegressor
 
 
 def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False, train_hyperparams=False,
-         print_feature_importance=False, select_features=False, n_jobs=1):
+         select_features=False, n_jobs=1):
+
     if parse_meltome:
         print("Reading Meltome Atlas file")
         pm = ParseMeltome(meltome_file)
@@ -17,13 +18,13 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
 
     if extract_features:
         # Extract features from amino acid sequences
-        ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
+        '''ExtractSeqFeatures.extractSequenceFeatures("meltome_seqs_complete.fasta",
                                                    features=["MISC", "AAC", "QSOrder", "CTDC", "PAAC", "AC", "CTriad", "DistancePair", "GAAC", "Geary",
                                                        "Moran", "SOCNumber", "CKSAAP type 1", "CTDD", "DPC type 1", "GDPC type 1", "NMBroto",
-                                                       "PseKRAAC type 10"])
+                                                       "PseKRAAC type 10"])'''
 
         #  clean up datasets
-        x_data, y_data, x_ids, y_ids, x_vars, y_vars, datasets = PredictKeyTemps.prepare_data("aa_features.csv",
+        x_data, y_data, x_ids, y_ids, x_vars, y_vars, datasets = PredictKeyTemps.prepare_data("aa_features_selected.csv",
                                                                                               "curve_params.csv",
                                                                                               pct_rmse=pct_rmse)
 
@@ -60,6 +61,11 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=False, hyperparam=train_hyperparams,
                                         fselect=select_features, n_jobs=n_jobs)
 
+    if select_features:
+        PredictKeyTemps.write_rfecv_features("feature_ranking_support.csv", "feature_names.txt")
+        PredictKeyTemps.write_selected_features("feature_ranking_support.csv", "aa_features.csv", "aa_features_selected.csv")
+        PredictKeyTemps.plot_rfecv_scores("rfecv_results.csv", 2839, 10)
+
 
     # cross validation for predictor performance
     # Train random forest regressor
@@ -74,26 +80,14 @@ def main(meltome_file, pct_rmse=70, parse_meltome=False, extract_features=False,
     pd.DataFrame(scores).to_csv("scores_rf.csv")
     '''
 
-    if print_feature_importance:
-        with open("aa_features.csv", "r") as f:
-            features = f.readline().strip("\n").split(",")[1:]
-
-        f_i = list(zip(features, regr.feature_importances_))
-        f_i.sort(key=lambda x: x[1])
-        plt.barh([x[0] for x in f_i[-31:-1]], [x[1] for x in f_i[-31:-1]])
-        plt.savefig("rf_feature_importances_30.png", bbox_inches='tight')
-        plt.close()
-
-
 if __name__ == '__main__':
     main(
         "cross-species.csv",
         pct_rmse=70,
         parse_meltome=False,
         extract_features=False,
-        train_hyperparams=False,
-        select_features=True,
-        print_feature_importance=False,
+        train_hyperparams=True,
+        select_features=False,
         n_jobs=5
     )
 
