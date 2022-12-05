@@ -69,7 +69,13 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
     else:
         df_full = df_prot
 
+    # write features
     df_full.to_csv("aa_features.csv", sep=",", lineterminator="\n", index=False)
+
+    # write only feature names
+    with open("feature_names.txt", "w", newline="\n") as f:
+        for i in range(1, len(df_full.columns)):
+            f.write(df_full.columns[i] + "\n")
 
     if hist_plot_flag:
         plot_histograms_misc(df_misc)
