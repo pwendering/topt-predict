@@ -88,6 +88,7 @@ def prepare_data(x_data_file, y_data_file, pct_rmse=95):
 
     return x_matrix, y_matrix, x_ids, y_ids, x_vars, y_vars, datasets
 
+
 def write_clean_data(x_data, y_data, datasets):
     print("Writing clean data to file")
     np.savetxt("X.csv", x_data, delimiter=",")
@@ -168,9 +169,37 @@ def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
     return rfecv
 
 
+def plot_rfecv_scores(rfecv_scores_file, n, step):
+    rfecv_scores = pd.read_csv(rfecv_scores_file)
+    av = rfecv_scores['mean_test_score'][1:]
+    sd = rfecv_scores['std_test_score'][1:]
+    n_features = list(range(n, 0, -step))
+    plt.plot(n_features, av)
+    plt.fill_between(n_features, av-sd, av+sd, alpha=0.3, facecolor="blue")
+    plt.xlabel("Number of features")
+    plt.ylabel("$R^2 (5x CV)$")
+    plt.savefig("rfecv_scores.png")
+
+
+def write_rfecv_features(rfecv_feature_support_file, feature_name_file):
+    fs = pd.read_csv(rfecv_feature_support_file)
+    fn = pd.read_csv(feature_name_file, header=0, names=["Feature"])
+    fs = pd.concat([fn, fs], axis=1)
+    fs.sort_values(by="ranking", inplace=True)
+    fs.to_csv("feature_ranking_rfecv_sorted.csv", index=False, lineterminator="\n")
+
+
+def write_selected_features(rfecv_feature_support_file, feature_input_file, feature_output_file):
+    fs = pd.read_csv(rfecv_feature_support_file)
+    feature_df = pd.read_csv(feature_input_file)
+    feature_df = feature_df.iloc[:, np.append(0, np.where(fs['support'])[0])]
+    feature_df.to_csv(feature_output_file, lineterminator="\n", index=False)
+
+
 def r2_scorer(estimator, X_test, y_test):
     y_pred = estimator.predict(X_test)
     return r2_score(y_test, y_pred)
+
 
 def score_prediction(y_pred, y_test):
     # RMSE
@@ -330,10 +359,10 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         # Number of features to consider at every split
         max_features = ['auto', 'sqrt']
         # Maximum number of levels in tree
-        max_depth = [int(x) for x in np.linspace(10, 110, num=11)]
+        max_depth = [int(x) for x in np.linspace(10, 150, num=5)]
         max_depth.append(None)
         # Minimum number of samples required to split a node
-        min_samples_split = [2, 5, 10]
+        min_samples_split = [2, 4, 6, 8]
         # Minimum number of samples required at each leaf node
         min_samples_leaf = [1, 2, 4]
         # Method of selecting samples for training each tree
@@ -346,8 +375,8 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
                        'min_samples_leaf': min_samples_leaf,
                        'bootstrap': bootstrap}
 
-        regr = RandomForestRegressor(random_state=42)
-        rf_random = RandomizedSearchCV(estimator=regr, param_distributions=random_grid, n_iter=100, cv=10, verbose=2,
+        kfsplit = KFold(n_splits=5, shuffle=True, random_state=42)
+        rf_random = RandomizedSearchCV(estimator=regr, param_distributions=random_grid, n_iter=100, cv=kfsplit, verbose=2,
                                        random_state=42, n_jobs=n_jobs)
         rf_random.fit(X_train_transformed, y_train)
         print(rf_random.best_params_)
@@ -355,6 +384,9 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         y_pred = rf_random.best_estimator_.predict(X_test_transformed)
         score_prediction(y_pred, y_test)
         scatter_test_pred(y_pred, y_test, groups, 'scatter_rf_optimized.png')
+
+        df = pd.DataFrame(rf_random.best_params_)
+        df.to_csv("rf_optimal_hyperparams.csv")
 
     print("Random Forest", end="\t")
     regr.fit(X_train_transformed, y_train)
