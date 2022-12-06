@@ -10,6 +10,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.feature_selection import RFECV, RFE
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
+import json
 import numpy as np
 import re
 from cubist import Cubist
@@ -20,6 +21,7 @@ from sklearn.neural_network import MLPRegressor
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import pandas as pd
+
 
 def read_x_data(x_data_file):
     print("Reading X data")
@@ -340,8 +342,10 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
     if optimal:
         hyperparam = False
         fselect = False
-        regr = RandomForestRegressor(random_state=42, n_estimators=1400, min_samples_split=5, min_samples_leaf=2,
-                                     max_features='sqrt', max_depth=None, bootstrap=False, n_jobs=n_jobs)
+
+        # read optimal parameters from file
+        opt_params = json.load(open("rf_optimal_hyperparams.json", "r"))
+        regr = RandomForestRegressor(**opt_params, random_state=42, n_jobs=n_jobs)
     else:
         regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
 
@@ -385,8 +389,8 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         score_prediction(y_pred, y_test)
         scatter_test_pred(y_pred, y_test, groups, 'scatter_rf_optimized.png')
 
-        df = pd.DataFrame(rf_random.best_params_)
-        df.to_csv("rf_optimal_hyperparams.csv")
+        # write optimal parameters to file
+        json.dump(rf_random.best_params_, open("rf_optimal_hyperparams.json", "w"))
 
     print("Random Forest", end="\t")
     regr.fit(X_train_transformed, y_train)
