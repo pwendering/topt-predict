@@ -53,7 +53,7 @@ def main(pct_rmse=70, extract_features=False, train_hyperparams=False,
                                         fselect=select_features, n_jobs=n_jobs)
 
     # save regression model
-    pickle.dump(regr, open("model/random_forest_opt_model_top.sav", 'wb'))
+    pickle.dump(regr, open("model/random_forest_opt_model_topt.sav", 'wb'))
 
     # Feature importances
     f_i = list(zip(regr.feature_names_in_, regr.feature_importances_))
