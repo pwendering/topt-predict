@@ -6,10 +6,13 @@ import seaborn as sb
 import matplotlib.pyplot as plt
 import os.path as op
 from protlearn.features import entropy
-
+import os
 
 def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
     print("Extracting sequence features")
+
+    outfilepath = os.path.dirname(fasta_file)
+
     if features is None:
         features = ["AAC", "MISC"]
 
@@ -28,7 +31,7 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
 
         if feat == "MISC":
             df_misc, ids, seq_idx = get_misc_features(fasta_file)
-        elif feat == "protdcal_prot" and check_file_exists(feat + ".csv"):
+        elif feat == "protdcal_prot" and check_file_exists(os.path.join(outfilepath, feat + ".csv")):
             df = pd.read_csv(feat + ".csv")
             # remove first column (protein IDs)
             df.drop(columns=df.columns[0], axis=1, inplace=True)
@@ -39,7 +42,7 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
                 continue
 
             print("=> Processing feature: %s" % feat)
-            fname = feat.replace(" ", "_") + ".csv"
+            fname = os.path.join(outfilepath, feat.replace(" ", "_") + ".csv")
             df_csv_bool = True
             if not check_file_exists(fname):
                 # perform calculation
@@ -70,10 +73,10 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
         df_full = df_prot
 
     # write features
-    df_full.to_csv("aa_features.csv", sep=",", lineterminator="\n", index=False)
+    df_full.to_csv(os.path.join(outfilepath, "aa_features.csv"), sep=",", lineterminator="\n", index=False)
 
     # write only feature names
-    with open("feature_names.txt", "w", newline="\n") as f:
+    with open(os.path.join(outfilepath, "feature_names.txt"), "w", newline="\n") as f:
         for i in range(1, len(df_full.columns)):
             f.write(df_full.columns[i] + "\n")
 
@@ -84,7 +87,8 @@ def extractSequenceFeatures(fasta_file, features=None, hist_plot_flag=True):
 def get_misc_features(fasta_file, seq_limit=50000):
     # sequence length, molecular weight, isoelectric point, aromaticity, instability index,
     # secondary structure fraction (helix, turn, sheet)
-    fname = "misc.csv"
+    outfilepath = os.path.dirname(fasta_file)
+    fname = os.path.join(outfilepath, "misc.csv")
     if not check_file_exists(fname):
         feat_lists = []
         ids = []
@@ -178,6 +182,7 @@ def count_group_fequencies(seq):
         group_freqs.append(np.sum([seq.count(groups[g][i]) for i in range(0, len(groups[g]))])/seq_length)
 
     return np.asarray(group_freqs)
+
 
 def check_valid_feature(feature):
     cmd_dict = get_cmd_dict()

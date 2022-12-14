@@ -1,3 +1,5 @@
+import pickle
+
 from sklearn.svm import SVR
 from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler
@@ -62,7 +64,6 @@ def prepare_x_data(x_data, x_ids, y_ids):
     match_idx = [np.where(x_ids == x)[0][0] for x in y_ids if x in x_ids]
     x_data = x_data[match_idx, :]
     x_ids = x_ids[match_idx]
-
     return x_data, x_ids
 
 
@@ -82,30 +83,33 @@ def prepare_data(x_data_file, y_data_file, pct_rmse=95):
     low_rmse_idx = [x < rmse_threshold for x in y_matrix[:, rmse_col_idx]]
 
     keep_row_idx = [i for i in range(0, len(nan_row_idx)) if low_rmse_idx[i] and not nan_row_idx[i]]
+
     y_matrix = y_matrix[keep_row_idx, :]
+    y_df = pd.DataFrame(y_matrix, columns=y_vars)
+
     x_matrix = x_matrix[keep_row_idx, :]
-    y_ids = [y_ids[i] for i in keep_row_idx]
-    x_ids = [x_ids[i] for i in keep_row_idx]
+    x_df = pd.DataFrame(x_matrix, columns=x_vars)
+
     datasets = [datasets[i] for i in keep_row_idx]
 
-    return x_matrix, y_matrix, x_ids, y_ids, x_vars, y_vars, datasets
+    return x_df, y_df, datasets
 
 
-def write_clean_data(x_data, y_data, datasets):
+def write_clean_data(x_data, y_data, datasets, x_filename, y_filename, group_filename):
     print("Writing clean data to file")
-    np.savetxt("X.csv", x_data, delimiter=",")
-    np.savetxt("y.csv", y_data, delimiter=",")
-    with open("groups.txt", "w", newline="\n") as f:
+    x_data.to_csv(x_filename, index=False)
+    y_data.to_csv(y_filename, index=False)
+    with open(group_filename, "w", newline="\n") as f:
         for line in datasets:
             f.write(line + "\n")
 
 
-def read_clean_data():
+def read_clean_data(x_filename, y_filename, group_filename):
     print("Reading data from file")
-    x_data = np.genfromtxt("X.csv", delimiter=",")
-    y_data = np.genfromtxt("y.csv", delimiter=",")
+    x_data = pd.read_csv(x_filename)
+    y_data = pd.read_csv(y_filename)
     groups = []
-    with open("groups.txt", "r") as f:
+    with open(group_filename, "r") as f:
         for line in f:
             groups.append(line.strip("\n"))
     return x_data, y_data, groups
@@ -116,12 +120,15 @@ def remove_y_outliers_per_group(x_data, y_data, groups):
     uniq_groups = set(groups)
     for g in uniq_groups:
         group_idx = np.asarray([i for i in range(0, len(groups)) if groups[i] == g])
-        med, sd = np.median(y_data[group_idx]), np.std(y_data[group_idx])
+        med, sd = np.median(y_data.iloc[group_idx]), np.std(y_data.iloc[group_idx])
         sd_threshold = 3 * sd
         t_lower, t_upper = med - sd_threshold, med + sd_threshold
-        remove_idx = np.where(np.logical_or((t_lower > y_data[group_idx]), (y_data[group_idx] > t_upper)))[0]
-        y_data = np.delete(y_data, group_idx[remove_idx])
-        x_data = np.delete(x_data, group_idx[remove_idx], axis=0)
+        remove_idx = np.where(np.logical_or((t_lower > y_data.iloc[group_idx]), (y_data.iloc[group_idx] > t_upper)))[0]
+        y_data.drop(group_idx[remove_idx], inplace=True)
+        y_data.reset_index(inplace=True, drop=True)
+        x_data.drop(group_idx[remove_idx], axis=0, inplace=True)
+        x_data.reset_index(inplace=True, drop=True)
+
         for i in sorted(remove_idx, reverse=True):
             del groups[group_idx[i]]
 
@@ -159,12 +166,12 @@ def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
     rfecv = rfecv.fit(X, y)
 
     res_df = pd.DataFrame(rfecv.cv_results_)
-    res_df.to_csv("rfecv_results.csv")
+    res_df.to_csv("feature_selection/rfecv_results.csv")
 
     feat_dict = {"ranking": rfecv.ranking_,
                  "support": rfecv.support_}
     feat_df = pd.DataFrame(feat_dict)
-    feat_df.to_csv("feature_ranking_support.csv")
+    feat_df.to_csv("feature_selection/feature_ranking_support.csv")
 
     print(str(rfecv.n_features_) + " features selected.")
 
@@ -180,7 +187,7 @@ def plot_rfecv_scores(rfecv_scores_file, n, step):
     plt.fill_between(n_features, av-sd, av+sd, alpha=0.3, facecolor="blue")
     plt.xlabel("Number of features")
     plt.ylabel("$R^2 (5x CV)$")
-    plt.savefig("rfecv_scores.png")
+    plt.savefig("feature_selection/rfecv_scores.png")
 
 
 def write_rfecv_features(rfecv_feature_support_file, feature_name_file):
@@ -188,7 +195,7 @@ def write_rfecv_features(rfecv_feature_support_file, feature_name_file):
     fn = pd.read_csv(feature_name_file, header=0, names=["Feature"])
     fs = pd.concat([fn, fs], axis=1)
     fs.sort_values(by="ranking", inplace=True)
-    fs.to_csv("feature_ranking_rfecv_sorted.csv", index=False, lineterminator="\n")
+    fs.to_csv("feature_selection/feature_ranking_rfecv_sorted.csv", index=False, lineterminator="\n")
 
 
 def write_selected_features(rfecv_feature_support_file, feature_input_file, feature_output_file):
@@ -216,7 +223,7 @@ def score_prediction(y_pred, y_test):
     print("%.2f" % np.corrcoef(y_test, y_pred)[0][1])
 
 
-def scatter_test_pred(y_pred, y_test, groups=None, fname="scatterplot.png"):
+def scatter_test_pred(y_pred, y_test, groups=None, fname="topt_scatter_plots/scatterplot.png"):
     df = pd.DataFrame({"y_test": y_test, "y_pred": y_pred, "groups": groups})
     ax = sb.scatterplot(data=df, x="y_test", y="y_pred", hue="groups")
     ax.set_ylim((0, 100))
@@ -231,13 +238,13 @@ def scatter_test_pred(y_pred, y_test, groups=None, fname="scatterplot.png"):
     plt.close(f)
 
 
-def perform_regression(regr, x_data, y_data, groups=None, plot=False, fout="scatter.png"):
+def perform_regression(regr, x_data, y_data, groups=None, plot=False, fout="topt_scatter_plots/scatterplot.png"):
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
 
     scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
+    X_train_transformed = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns)
     regr.fit(X_train_transformed, y_train)
-    X_test_transformed = scaler.transform(X_test)
+    X_test_transformed = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
     y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
 
@@ -286,7 +293,7 @@ def lasso(x_data, y_data, alpha=.01):
 def gbdt(x_data, y_data, groups=None):
     print("GBDT", end="\t")
     regr = GradientBoostingRegressor()
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_gbdt.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_gbdt.png", groups=groups)
     return regr
 
 
@@ -300,35 +307,35 @@ def adaboost(x_data, y_data):
 def knn(x_data, y_data, groups=None, k=10):
     print("KNN", end="\t")
     regr = KNeighborsRegressor(n_neighbors=k)
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_knn.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_knn.png", groups=groups)
     return regr
 
 
 def cubist_reg(x_data, y_data, groups=None):
     print("Cubist", end="\t")
     regr = Cubist()
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_cubist.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_cubist.png", groups=groups)
     return regr
 
 
 def bayesian_ridge(x_data, y_data, groups=None):
     print("Bayesian ridge", end="\t")
     regr = linear_model.BayesianRidge()
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_bayesian_ridge.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_bayesian_ridge.png", groups=groups)
     return regr
 
 
 def xgboost_reg(x_data, y_data, groups=None):
     print("XGBoost", end="\t")
     regr = XGBRegressor()
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_xgboost.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_xgboost.png", groups=groups)
     return regr
 
 
 def mlpreg(x_data, y_data, groups=None):
     print("MLP", end="\t")
     regr = MLPRegressor()
-    regr = perform_regression(regr, x_data, y_data, plot=True, fout="scatter_mlp.png", groups=groups)
+    regr = perform_regression(regr, x_data, y_data, plot=True, fout="topt_scatter_plots/scatter_mlp.png", groups=groups)
     return regr
 
 
@@ -336,15 +343,16 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
     scaler = get_scaler(X_train)
-    X_train_transformed = scaler.transform(X_train)
-    X_test_transformed = scaler.transform(X_test)
+    pickle.dump(scaler, open('model/x_scaler.pkl', 'wb'))
+    X_train_transformed = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns)
+    X_test_transformed = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
     if optimal:
         hyperparam = False
         fselect = False
 
         # read optimal parameters from file
-        opt_params = json.load(open("rf_optimal_hyperparams.json", "r"))
+        opt_params = json.load(open("hyperparameter_tuning/rf_optimal_hyperparams.json", "r"))
         regr = RandomForestRegressor(**opt_params, random_state=42, n_jobs=n_jobs)
     else:
         regr = RandomForestRegressor(random_state=42, n_jobs=n_jobs)
@@ -387,17 +395,17 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         print("\nRandom Forest (optimized)", end="\t")
         y_pred = rf_random.best_estimator_.predict(X_test_transformed)
         score_prediction(y_pred, y_test)
-        scatter_test_pred(y_pred, y_test, groups, 'scatter_rf_optimized.png')
+        scatter_test_pred(y_pred, y_test, groups, 'topt_scatter_plots/scatter_rf_optimized.png')
 
         # write optimal parameters to file
-        json.dump(rf_random.best_params_, open("rf_optimal_hyperparams.json", "w"))
+        json.dump(rf_random.best_params_, open("hyperparameter_tuning/rf_optimal_hyperparams.json", "w"))
 
     print("Random Forest", end="\t")
     regr.fit(X_train_transformed, y_train)
 
     y_pred = regr.predict(X_test_transformed)
     score_prediction(y_pred, y_test)
-    scatter_test_pred(y_pred, y_test, groups, 'scatter_rf.png')
+    scatter_test_pred(y_pred, y_test, groups, 'topt_scatter_plots/scatter_rf.png')
 
     return regr
 
