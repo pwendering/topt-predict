@@ -10,7 +10,7 @@ from sklearn.ensemble import AdaBoostRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import RandomizedSearchCV, KFold
-from sklearn.feature_selection import RFECV, RFE
+from sklearn.feature_selection import RFECV
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 import json
 import numpy as np
@@ -67,22 +67,24 @@ def prepare_x_data(x_data, x_ids, y_ids):
     return x_data, x_ids
 
 
-def prepare_data(x_data_file, y_data_file, pct_rmse=95):
+def prepare_data(x_data_file, y_data_file, t_r2=95):
     x_matrix, x_ids, x_vars = read_x_data(x_data_file)
     y_matrix, y_ids, y_vars, datasets = read_y_data(y_data_file)
 
     y_matrix, y_ids, datasets = prepare_y_data(y_matrix, y_ids, x_ids, datasets)
     x_matrix, x_ids = prepare_x_data(x_matrix, x_ids, y_ids)
 
-    # remove rows with nan values and with insufficient RMSE (remove upper 5%, distribution is highly left-skewed)
+    # remove rows with nan values and with insufficient R2 (< 0.6)
     print("Cleaning datasets")
     nan_row_idx = [np.isnan(x_matrix[row, :]).any() or np.isnan(y_matrix[row, :]).any()
                    for row in range(0, x_matrix.shape[0])]
-    rmse_col_idx = [x == "rmse" for x in y_vars]
-    rmse_threshold = np.nanpercentile(y_matrix[:, rmse_col_idx], pct_rmse)
-    low_rmse_idx = [x < rmse_threshold for x in y_matrix[:, rmse_col_idx]]
 
-    keep_row_idx = [i for i in range(0, len(nan_row_idx)) if low_rmse_idx[i] and not nan_row_idx[i]]
+    if t_r2 is not None and t_r2 < 1:
+        r2_col_idx = [x == "r2_adj" for x in y_vars]
+        suff_r2_idx = [x >= t_r2 for x in y_matrix[:, r2_col_idx]]
+        keep_row_idx = [i for i in range(0, len(nan_row_idx)) if suff_r2_idx[i] and not nan_row_idx[i]]
+    else:
+        keep_row_idx = [i for i in range(0, len(nan_row_idx)) if not nan_row_idx[i]]
 
     y_matrix = y_matrix[keep_row_idx, :]
     y_df = pd.DataFrame(y_matrix, columns=y_vars)
@@ -151,7 +153,8 @@ def get_scaler(X_train, method="standard"):
     return scaler
 
 
-def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
+def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5, rfecv_result_file="feature_selection/rfecv_results.csv",
+                            feature_support_file="feature_selection/feature_ranking_support.csv"):
     print("Running RFECV")
     # print("JOBS=%d, STEP=%d, CV=%d" % (n_jobs, step, cv))
     rfecv = RFECV(
@@ -166,12 +169,12 @@ def feature_selection_rfecv(X, y, regr, n_jobs=1, step=1, cv=5):
     rfecv = rfecv.fit(X, y)
 
     res_df = pd.DataFrame(rfecv.cv_results_)
-    res_df.to_csv("feature_selection/rfecv_results.csv")
+    res_df.to_csv(rfecv_result_file)
 
     feat_dict = {"ranking": rfecv.ranking_,
                  "support": rfecv.support_}
     feat_df = pd.DataFrame(feat_dict)
-    feat_df.to_csv("feature_selection/feature_ranking_support.csv")
+    feat_df.to_csv(feature_support_file)
 
     print(str(rfecv.n_features_) + " features selected.")
 
@@ -339,11 +342,14 @@ def mlpreg(x_data, y_data, groups=None):
     return regr
 
 
-def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fselect=False, n_jobs=1):
+def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fselect=False, n_jobs=1,
+                 rfecv_result_file="feature_selection/rfecv_results.csv",
+                 feature_support_file="feature_selection/feature_ranking_support.csv",
+                 x_scaler_file="model/x_scaler.pkl"):
     X_train, X_test, y_train, y_test, idx_test = split_data_train_test(x_data, y_data)
     groups = [groups[i] for i in idx_test]
     scaler = get_scaler(X_train)
-    pickle.dump(scaler, open('model/x_scaler.pkl', 'wb'))
+    pickle.dump(scaler, open(x_scaler_file, 'wb'))
     X_train_transformed = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns)
     X_test_transformed = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
 
@@ -362,7 +368,9 @@ def randomforest(x_data, y_data, groups=None, optimal=True, hyperparam=False, fs
         scaler = get_scaler(x_data)
         x_data_transformed = scaler.transform(x_data)
         kfsplit = KFold(n_splits=5, shuffle=True, random_state=42)
-        feature_selection_rfecv(x_data_transformed, y_data, regr, n_jobs=n_jobs, step=10, cv=kfsplit)
+        feature_selection_rfecv(x_data_transformed, y_data, regr, n_jobs=n_jobs, step=10, cv=kfsplit,
+                                rfecv_result_file=rfecv_result_file,
+                                feature_support_file=feature_support_file)
 
     if hyperparam:
         print("\nHyperparameter fitting")
