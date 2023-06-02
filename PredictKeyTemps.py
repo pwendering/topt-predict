@@ -67,7 +67,7 @@ def prepare_x_data(x_data, x_ids, y_ids):
     return x_data, x_ids
 
 
-def prepare_data(x_data_file, y_data_file, t_r2=95):
+def prepare_data(x_data_file, y_data_file, t_r2=0.6):
     x_matrix, x_ids, x_vars = read_x_data(x_data_file)
     y_matrix, y_ids, y_vars, datasets = read_y_data(y_data_file)
 
