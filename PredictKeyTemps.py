@@ -195,7 +195,7 @@ def plot_rfecv_scores(rfecv_scores_file, n, step):
 
 def write_rfecv_features(rfecv_feature_support_file, feature_name_file):
     fs = pd.read_csv(rfecv_feature_support_file)
-    fn = pd.read_csv(feature_name_file, header=0, names=["Feature"])
+    fn = pd.read_csv(feature_name_file, header=None, names=["Feature"])
     fs = pd.concat([fn, fs], axis=1)
     fs.sort_values(by="ranking", inplace=True)
     fs.to_csv("feature_selection/feature_ranking_rfecv_sorted.csv", index=False, lineterminator="\n")
@@ -204,9 +204,8 @@ def write_rfecv_features(rfecv_feature_support_file, feature_name_file):
 def write_selected_features(rfecv_feature_support_file, feature_input_file, feature_output_file):
     fs = pd.read_csv(rfecv_feature_support_file)
     feature_df = pd.read_csv(feature_input_file)
-    feature_df = feature_df.iloc[:, np.append(0, np.where(fs['support'])[0])]
+    feature_df = feature_df.iloc[:, np.append(0, np.where(fs['support'])[0]+1)]
     feature_df.to_csv(feature_output_file, lineterminator="\n", index=False)
-
 
 def r2_scorer(estimator, X_test, y_test):
     y_pred = estimator.predict(X_test)
