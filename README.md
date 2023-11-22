@@ -20,7 +20,14 @@ $ pip install -r requirements.txt
 
 If you don't have virtualenv installed, you can get it using `pip install virtualenv` on the command line.
 
-## Usage
+The trained model file is not included in the repository because of its large size.
+It can be created by running
+```
+python3.9 create_rf_model.py
+```
+This script also extracts feature importances and runs a cross-validation scheme to evaluate the performance.
+
+## Usage of predict_topt.py
 
 Use the `-h` option to display required and optional input arguments:
 
