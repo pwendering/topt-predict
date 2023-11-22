@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import KFold, cross_validate
 
 
 def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
@@ -12,8 +12,7 @@ def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
 
     # output file names
     aa_feature_file = "training_data/aa_features.csv"
-    # aa_feature_selected_file = "training_data/aa_features_selected.csv"
-    aa_feature_selected_file = "training_data/aa_features.csv"
+    aa_feature_selected_file = "training_data/aa_features_selected.csv"
     x_data_clean_file = "training_data/X.csv"
     y_data_clean_file = "training_data/y.csv"
     groups_clean_file = "training_data/groups.txt"
@@ -28,7 +27,7 @@ def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
     if extract_features:
         features = ["MISC", "AAC", "QSOrder", "CTDC", "PAAC", "AC", "CTriad", "DistancePair", "GAAC", "Geary", "Moran",
                     "SOCNumber", "CKSAAP type 1", "CTDD", "DPC type 1", "GDPC type 1", "NMBroto", "PseKRAAC type 10"]
-        # features = ["MISC", "AAC", "QSOrder", "CTDC", "PAAC"]
+
         # Extract features from amino acid sequences
         ExtractSeqFeatures.extractSequenceFeatures("training_data/meltome_seqs.fasta", features=features)
 
@@ -50,22 +49,25 @@ def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
     X, y, datasets = PredictKeyTemps.remove_y_outliers_per_group(x_data, -y_data.loc[:, 'beta_param_2'], datasets)
     print("Reduced number of samples: %d" % X.shape[0])
 
+    # Compare different regression models with default settings
     print("\n\nTesting different regression approaches:\n")
     print("Approach\tRMSE\tMAE\tMAPE\tR2\trhoP")
-    # PredictKeyTemps.lasso(X, y)
-    # PredictKeyTemps.ridge(X, y)
-    # PredictKeyTemps.svr_rbf(X, y)
-    # PredictKeyTemps.svr_linear(X, y)
-    # PredictKeyTemps.adaboost(X, y)
-    # PredictKeyTemps.xgboost_reg(X, y, datasets)
-    # PredictKeyTemps.mlpreg(X, y, datasets)
-    # PredictKeyTemps.bayesian_ridge(X, y, datasets)
-    # PredictKeyTemps.gbdt(X, y, datasets)
-    # PredictKeyTemps.cubist_reg(X, y, datasets)
-    # PredictKeyTemps.knn(X, y, datasets)
-    # PredictKeyTemps.randomforest(X, y, datasets, x_scaler_file=x_scaler_file)
 
-    regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=False, hyperparam=train_hyperparams,
+    PredictKeyTemps.lasso(X, y)
+    PredictKeyTemps.ridge(X, y)
+    PredictKeyTemps.svr_rbf(X, y)
+    PredictKeyTemps.svr_linear(X, y)
+    PredictKeyTemps.adaboost(X, y)
+    PredictKeyTemps.xgboost_reg(X, y, datasets)
+    PredictKeyTemps.mlpreg(X, y, datasets)
+    PredictKeyTemps.bayesian_ridge(X, y, datasets)
+    PredictKeyTemps.gbdt(X, y, datasets)
+    PredictKeyTemps.cubist_reg(X, y, datasets)
+    PredictKeyTemps.knn(X, y, datasets)
+    PredictKeyTemps.randomforest(X, y, datasets, x_scaler_file=x_scaler_file, optimal=False)
+
+    # Random Forest regression
+    regr = PredictKeyTemps.randomforest(X, y, datasets, optimal=True, hyperparam=train_hyperparams,
                                         fselect=select_features, n_jobs=n_jobs, rfecv_result_file=rfecv_result_file,
                                         feature_support_file=feature_ranking_rfecv_file, x_scaler_file=x_scaler_file)
 
@@ -88,6 +90,7 @@ def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
         for fi in f_i:
             f.write(fi[0] + "\t" + str(fi[1]) + "\n")
 
+    #
     if select_features:
         PredictKeyTemps.write_rfecv_features(feature_ranking_rfecv_file,
                                              feature_names_file)
@@ -96,16 +99,15 @@ def main(t_r2=0.6, extract_features=False, train_hyperparams=False,
                                                 aa_feature_selected_file)
         PredictKeyTemps.plot_rfecv_scores(rfecv_result_file, 2839, 10)
 
-
     # cross validation for predictor performance
-    '''scoring = ['neg_root_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error',
+    scoring = ['neg_root_mean_squared_error', 'neg_mean_absolute_error', 'neg_mean_absolute_percentage_error',
                'r2']
-    scaler = StandardScaler().fit(X)
+    scaler = pickle.load(open(x_scaler_file, 'rb'))
     X_transformed = scaler.transform(X)
     kfsplit = KFold(n_splits=5, shuffle=True, random_state=42)
     scores = cross_validate(regr, X_transformed, y, scoring=scoring, cv=kfsplit, n_jobs=n_jobs, pre_dispatch=n_jobs, verbose=2)
-    pd.DataFrame(scores).to_csv("scores_rf_optimal.csv")'''
+    pd.DataFrame(scores).to_csv("scores_rf_optimal.csv")
 
 
 if __name__ == '__main__':
-    main(t_r2=0.6, extract_features=True, train_hyperparams=False, select_features=False, n_jobs=4)
+    main(t_r2=0.6, extract_features=False, train_hyperparams=False, select_features=False, n_jobs=4)

@@ -178,7 +178,7 @@ def count_group_fequencies(seq):
     }
     seq_length = len(seq)
     group_freqs = []
-    for g in groups.keys():#
+    for g in groups.keys():
         group_freqs.append(np.sum([seq.count(groups[g][i]) for i in range(0, len(groups[g]))])/seq_length)
 
     return np.asarray(group_freqs)
