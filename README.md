@@ -8,13 +8,13 @@
 ## Setup
 
 1) Clone the GitHub repository
-`$ git clone https://github.com/pwendering/tpppredict`
-2) Create a virtual environment "tpppredict" from the requirements.txt file
+`$ git clone https://github.com/pwendering/topt-predict`
+2) Create a virtual environment "topt-predict" from the requirements.txt file
 
 ```
 $ cd toptpredict
-$ virtualenv tpppredict
-$ source tpppredict/bin/activate
+$ virtualenv topt-predict
+$ source topt-predict/bin/activate
 $ pip install -r requirements.txt
 ```
 
