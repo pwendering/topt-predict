@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     parser.add_argument('seq_file', type=str, help='fasta-formatted file containing amino acid sequences')
     parser.add_argument('-m', '--model', type=str, help='regression model file (.sav)',
-                        default="model/random_forest_opt_model_top.sav")
+                        default="model/random_forest_opt_model.sav")
     parser.add_argument('-e', '--extract_features', help='extract features from amino acid sequences (will be stored ' +
                                                          'in same directory as sequence file)',
                         action='store_true', default=False)
